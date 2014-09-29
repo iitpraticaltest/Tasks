@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<meta http-equiv="X-UA-Compatible" content="IE=edge">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<title>Tasks</title>
+		<link href="http://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.2.0/css/bootstrap.min.css" rel="stylesheet">
+		<style type="text/css">body { margin-top:60px; } </style>
+	</head>
+	<body>
+		<script id="template_t_r_task" type="text/html">
+			{{^tasks}}
+				<tr>
+					<td>n/a</td>
+					<td>No tasks</td>
+					<td></td>
+				</tr>
+			{{/tasks}}
+			{{#tasks}}
+				<tr id="{{id}}">
+					<td>{{{status}}}</td>
+					<td>{{title}}</td>
+					<td>{{{remove}}}</td>
+				</tr>
+			{{/tasks}}
+		</script>
+		<script id="template_t_r_f_actives" type="text/html">{{actives}}</script>
+		<script id="template_t_r_f_completed" type="text/html">
+			<a id="remove_completed" href="#">Remove completed items</a>
+		</script>
+		<div class="navbar navbar-inverse navbar-fixed-top" role="navigation">
+			<div class="container">
+				<div class="navbar-header">
+					<button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target=".navbar-collapse">
+						<span class="sr-only">Toggle navigation</span>
+						<span class="icon-bar"></span>
+						<span class="icon-bar"></span>
+						<span class="icon-bar"></span>
+					</button>
+					<a class="navbar-brand" href="#">Tasks</a>
+				</div>
+				<div class="collapse navbar-collapse">
+					<ul class="nav navbar-nav">
+						<li class="l_all"><a href="#">All</a></li>
+						<li class="l_completed"><a href="#completed">Completed</a></li>
+						<li class="l_active"><a href="#active">Active</a></li>
+					</ul>
+				</div><!--/.nav-collapse -->
+			</div>
+		</div>
+		<div class="container">
+			<div class="row">
+				<div class="col-md-6 col-md-offset-3">
+					<form role="form" id="f_a">
+						<input type="text" class="form-control" id="f_a_task" placeholder="Task...">
+					</form>
+				</div>
+				<div class="col-md-6 col-md-offset-3">
+					<div class="table-reponsive">
+						<table class="table table-striped table-hover">
+							<thead>
+								<tr>
+									<th>Status</th>
+									<th>Task</th>
+									<th>Remove</th>
+								</tr>
+							</thead>
+							<tbody id="t_t_list">
+								<tr>
+									<td>n/a</td>
+									<td>No tasks</td>
+									<td></td>
+								</tr>
+							</tbody>
+						</table>
+					</div>
+				</div>
+			</div>
+			<div class="row">
+				<div id="actives" class="text-center col-md-6 col-md-offset-3"></div>
+			</div>
+			<div class="row">
+				<div id="completed" class="text-center col-md-6 col-md-offset-3"></div>
+			</div>
+		</div><!-- /.container -->
+		<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+		<script src="http://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.2.0/js/bootstrap.min.js"></script>
+		<script src="http://twitter.github.com/hogan.js/builds/3.0.1/hogan-3.0.1.js"></script>
+		<script language="javascript">
+			$( document ).ready
+			(
+				function( )
+				{
+					var tasks = { 'tasks': [ ] };
+					var templates = [ ];
+					templates[ 't_r_task' ] = Hogan.compile( $( '#template_t_r_task' ).html( ) );
+					templates[ 't_r_f_actives' ] = Hogan.compile( $( '#template_t_r_f_actives' ).html( ) );
+					templates[ 't_r_f_completed' ] = Hogan.compile( $( '#template_t_r_f_completed' ).html( ) );
+
+					// Source: https://github.com/leahciMic/uuid-v4/blob/master/uuidv4.js
+					function uuid()
+					{
+						var d = new Date().getTime();
+						return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace
+						(
+							/[xy]/g,
+							function( c )
+							{
+								var r = (d + Math.random()*16)%16 | 0;
+								d = Math.floor(d/16);
+								return (c=='x' ? r : (r&0x7|0x8)).toString(16);
+							}
+						);
+					}
+
+					function updateList( type )
+					{
+						$.ajax
+						(
+							{
+								type: 'POST',
+								url: 'http://tasks.humanoids.iit.it/balocco/tasks/',
+								contentType: "application/json; charset=utf-8",
+								headers:
+								{
+									'X-Requested-With': 'XMLHttpRequest'
+								},
+								crossDomain: true,
+								dataType:'json',
+								data: JSON.stringify( tasks )
+							}
+						);
+						if( !type )
+						{
+							var type = window.location.hash.substring( 1 );
+						}
+						if( !type || ( ( 'active' != type ) && ( 'completed' != type ) && ( 'all' != type ) ) )
+						{
+							type = 'all';
+						}
+						var total_active = 0;
+						var total_completed = 0;
+						var tasks_data = { 'tasks': [ ] };
+						for( var i = 0; i < tasks[ 'tasks' ].length; i++ )
+						{
+							var task = tasks[ 'tasks' ][ i ];
+							if( 0 == task.completed )
+							{
+								total_active++;
+							}
+							else
+							{
+								total_completed++;
+							}
+							if( 'all' == type || ( ( 'completed' == type ) && ( 1 == task.completed ) ) || ( ( 'active' == type ) && ( 0 == task.completed ) ) )
+							{
+								var item = { };
+								item.remove = '<span class="remove-item glyphicon glyphicon-remove" data-id="' + task.id + '"></span>';
+								var icon = 'time';
+								if( 1 == task.completed )
+								{
+									var icon = 'ok';
+								}
+								item.status = '<span class="toogle-item glyphicon glyphicon-' + icon + '" data-id="' + task.id + '" data-completed="' + task.completed + '"></span>';
+								item.id = task.id;
+								item.title = task.title;
+								tasks_data[ 'tasks'].push( item );
+							}
+						}
+						$( '#t_t_list' ).html( '' );
+						$( '#t_t_list' ).html( templates[ 't_r_task' ].render( tasks_data ) );
+
+						$( '#actives' ).html( '' );
+						if( 0 < total_active )
+						{
+							$( '#actives' ).html( templates[ 't_r_f_actives' ].render( { actives: 'Total active tasks: ' + total_active } ) );
+						}
+
+						$( '#completed' ).html( '' );
+						if( 0 < total_completed )
+						{
+							$( '#completed' ).html( templates[ 't_r_f_completed' ].render( { } ) );
+							$( '#remove_completed' ).click
+							(
+								function( e )
+								{
+									e.preventDefault( );
+									for( var i = tasks[ 'tasks' ].length - 1; -1 < i; i-- )
+									{
+										if( 1 == tasks[ 'tasks' ][ i ][ 'completed' ] )
+										{
+											tasks[ 'tasks' ].splice( i, 1 );
+										}
+									}
+									updateList( );
+								}
+							);
+						}
+
+						$( '.remove-item' ).click
+						(
+							function( )
+							{
+								var id = $( this ).data( 'id' );
+								for( var i = 0; tasks[ 'tasks' ].length > i; i++ )
+								{
+									if( id == tasks[ 'tasks' ][ i ][ 'id' ] )
+									{
+										tasks[ 'tasks' ].splice( i, 1 );
+									}
+								}
+								updateList( );
+							}
+						);
+
+						$( '.toogle-item' ).click
+						(
+							function( )
+							{
+								var id = $( this ).data( 'id' );
+								for( var i = 0; i < tasks[ 'tasks' ].length; i++ )
+								{
+									if( id == tasks[ 'tasks' ][ i ][ 'id' ] )
+									{
+										tasks[ 'tasks' ][ i ][ 'completed' ] ^= 1;
+									}
+								}
+								updateList( );
+							}
+						);
+					}
+
+					$( '.navbar-nav > li > a' ).click
+					(
+						function( e )
+						{
+							var hash = e.toElement.hash.substring( 1 );
+							if( !hash )
+							{
+								hash = 'all';
+							}
+							updateList( hash );
+						}
+					);
+
+					$.ajax
+					(
+						{
+							url: 'http://tasks.humanoids.iit.it/balocco/tasks/',
+							contentType: "application/json; charset=utf-8",
+							headers:
+							{
+								'X-Requested-With': 'XMLHttpRequest'
+							},
+							crossDomain: true,
+							dataType:'json'
+						}
+					).done
+					(
+						function( data )
+						{
+							tasks = data;
+							updateList( );
+						}
+					);
+
+					$( '#f_a' ).submit
+					(
+						function( e )
+						{
+							e.preventDefault( );
+							tasks[ 'tasks' ].push
+							(
+								{
+									id: uuid( ),
+									title: $( '#f_a_task' ).val( ),
+									completed: 0
+								}
+							);
+							$( '#f_a_task' ).val( '' );
+							updateList( );
+						}
+					);
+				}
+			);
+		</script>
+	</body>
+</html>
